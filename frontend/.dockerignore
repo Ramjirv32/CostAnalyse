@@ -1,0 +1,14 @@
+node_modules
+dist
+release
+out
+*.log
+.git
+.gitignore
+.vscode
+.idea
+*.md
+!README.md
+.env
+.DS_Store
+*.local
