@@ -18,6 +18,7 @@ router.get('/', auth, async (req, res) => {
   try {
     const devices = await Device.findByUser(req.user.id)
       .populate('userId', 'name email')
+      .populate('esp32Id', 'name macAddress location')
       .sort({ name: 1 });
 
     res.json({
@@ -41,7 +42,8 @@ router.get('/:id', auth, async (req, res) => {
       _id: req.params.id,
       userId: req.user.id,
       isActive: true
-    }).populate('userId', 'name email');
+    }).populate('userId', 'name email')
+      .populate('esp32Id', 'name macAddress location ipAddress');
 
     if (!device) {
       return res.status(404).json({

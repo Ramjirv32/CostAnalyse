@@ -76,6 +76,13 @@ class EnergySimulator {
 
       // For each user
       for (const user of users) {
+        // Get user's currency preferences
+        const userCurrencyPrefs = user.currencyPreferences || {
+          electricityRate: 0.12,
+          currencySymbol: '$',
+          currency: 'USD'
+        };
+        
         // Get user's devices
         const devices = await Device.find({ 
           userId: user._id, 
@@ -100,8 +107,8 @@ class EnergySimulator {
             const current = currentPower / voltage; // Amperes
             const frequency = 50 + (Math.random() - 0.5) * 0.2; // 49.9-50.1Hz
 
-            // Calculate costs
-            const costPerKwh = 0.20;
+            // Calculate costs using USER'S electricity rate
+            const costPerKwh = userCurrencyPrefs.electricityRate;
             const costPerSecond = (currentPower / 1000) * costPerKwh / 3600;
             const costPerHour = (currentPower / 1000) * costPerKwh;
             const costPerDay = costPerHour * 24;
@@ -120,6 +127,8 @@ class EnergySimulator {
               current: current,
               frequency: frequency,
               costPerKwh: costPerKwh,
+              currency: userCurrencyPrefs.currency,
+              currencySymbol: userCurrencyPrefs.currencySymbol,
               instantCost: costPerSecond,
               costPerSecond: costPerSecond,
               costPerHour: costPerHour,

@@ -50,6 +50,14 @@ const energyEstimateSchema = new mongoose.Schema({
     type: Number,
     default: 0.20
   },
+  currency: {
+    type: String,
+    default: 'USD'
+  },
+  currencySymbol: {
+    type: String,
+    default: '$'
+  },
   instantCost: {
     type: Number
   },

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { PreferencesProvider } from './contexts/PreferencesContext';
 import StartupScreen from './pages/StartupScreen';
 import WelcomeScreen from './pages/WelcomeScreen';
 import LoginScreen from './pages/LoginScreen';
 import Dashboard from './pages/Dashboard';
 import WiFiDevices from './pages/WiFiDevices';
+import PreferencesSettings from './pages/PreferencesSettings';
 import './index.css';
 
 function App() {
@@ -66,14 +68,26 @@ function App() {
   }
 
   if (currentScreen === 'dashboard') {
-    return <Dashboard user={user} onLogout={handleLogout} onNavigateToWiFi={() => setCurrentScreen('wifi')} />;
+    return <Dashboard user={user} onLogout={handleLogout} onNavigateToWiFi={() => setCurrentScreen('wifi')} onNavigateToSettings={() => setCurrentScreen('preferences')} />;
   }
 
   if (currentScreen === 'wifi') {
     return <WiFiDevices user={user} onBack={() => setCurrentScreen('dashboard')} />;
   }
 
+  if (currentScreen === 'preferences') {
+    return <PreferencesSettings user={user} onBack={() => setCurrentScreen('dashboard')} />;
+  }
+
   return null;
 }
 
-export default App;
+function AppWrapper() {
+  return (
+    <PreferencesProvider>
+      <App />
+    </PreferencesProvider>
+  );
+}
+
+export default AppWrapper;

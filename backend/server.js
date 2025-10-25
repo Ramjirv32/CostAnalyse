@@ -10,28 +10,29 @@ const deviceRoutes = require('./routes/devices');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const wifiDeviceRoutes = require('./routes/wifiDevices');
+const wifiManagementRoutes = require('./routes/wifi');
+const wifiEnergyRoutes = require('./routes/wifiEnergy');
+const currencyRoutes = require('./routes/currency');
 const energyEstimateRoutes = require('./routes/energyEstimates');
+const preferencesRoutes = require('./routes/preferences');
 const energySimulator = require('./services/energySimulator');
+const wifiEnergyCalculator = require('./services/wifiEnergyCalculator');
 const emailService = require('./services/emailService');
 const alertService = require('./services/alertService');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Security middleware
-app.use(helmet());
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
-});
-app.use(limiter);
 
 // CORS configuration
 app.use(cors({
   origin: ['http://localhost:5173', 'http://localhost:3000'],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+
 }));
 
 // Body parsing middleware
@@ -53,6 +54,9 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot-manag
   setTimeout(() => {
     // Start energy simulator
     energySimulator.start(10); // Generate data every 10 seconds
+    
+    // Start WiFi energy calculator
+    wifiEnergyCalculator.start(10); // Calculate WiFi energy every 10 seconds
     
     // Initialize email service
     emailService.initialize();
@@ -77,8 +81,12 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot-manag
 app.use('/api/auth', authRoutes);
 app.use('/api/devices', deviceRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/wifi', wifiDeviceRoutes);
+app.use('/api/wifi', wifiManagementRoutes);
+app.use('/api/wifi-management', wifiDeviceRoutes);
+app.use('/api/wifi-energy', wifiEnergyRoutes);
+app.use('/api/currency', currencyRoutes);
 app.use('/api/energy', energyEstimateRoutes);
+app.use('/api/preferences', preferencesRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

@@ -5,6 +5,7 @@ import {
   Zap,
   TrendingUp,
   Settings as SettingsIcon,
+  Settings,
   LogOut,
   Thermometer,
   Lightbulb,
@@ -23,17 +24,20 @@ import {
   Bell,
   HelpCircle,
   ChevronLeft,
-  RefreshCw
+  RefreshCw,
+  FileText
 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 // Import page components
 import Analytics from './Analytics';
 import Statistics from './Statistics';
+import Reports from './Reports';
 import Notifications from './Notifications';
 import HelpSupport from './HelpSupport';
-import Settings from './Settings';
-import WiFiDevicesNew from './WiFiDevicesNew';
+import WiFiManagement from './WiFiManagement';
+// import Settings from './Settings';
+import CurrencySelection from '../components/CurrencySelection';
 
 const deviceIcons = {
   light: Lightbulb,
@@ -43,7 +47,7 @@ const deviceIcons = {
   other: Zap
 };
 
-export default function Dashboard({ user, onLogout, onNavigateToWiFi }) {
+export default function Dashboard({ user, onLogout, onNavigateToWiFi, onNavigateToSettings }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeView, setActiveView] = useState('dashboard');
   const [timeFilter, setTimeFilter] = useState('daily'); // 'daily', 'weekly', 'monthly'
@@ -60,6 +64,10 @@ export default function Dashboard({ user, onLogout, onNavigateToWiFi }) {
   const [deviceEnergyFlow, setDeviceEnergyFlow] = useState({});
   const [realtimeStats, setRealtimeStats] = useState(null);
   const [energySummary, setEnergySummary] = useState(null);
+
+  // Currency preferences
+  const [currencyPrefs, setCurrencyPrefs] = useState(null);
+  const [showCurrencySelection, setShowCurrencySelection] = useState(false);
 
   // Setup demo devices automatically
   const setupDemoDevices = async () => {
@@ -233,6 +241,56 @@ export default function Dashboard({ user, onLogout, onNavigateToWiFi }) {
     }
   };
 
+  // Fetch currency preferences
+  const fetchCurrencyPreferences = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/currency', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setCurrencyPrefs(data.data);
+          
+          // Show currency selection modal if it's the user's first time
+          if (!data.data.currency || data.data.currency === 'USD') {
+            // Only show if user hasn't explicitly set preferences
+            const hasSetPrefs = localStorage.getItem('currencyPrefsSet');
+            if (!hasSetPrefs) {
+              setShowCurrencySelection(true);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching currency preferences:', error);
+    }
+  };
+
+  // Handle currency preference update
+  const handleCurrencyUpdate = (newPrefs) => {
+    if (newPrefs) {
+      setCurrencyPrefs(newPrefs);
+      localStorage.setItem('currencyPrefsSet', 'true');
+    }
+    setShowCurrencySelection(false);
+  };
+
+  // Format currency based on user preferences
+  const formatCurrency = (amount, decimals = 2) => {
+    if (!currencyPrefs) return `$${amount.toFixed(decimals)}`;
+    
+    const symbol = currencyPrefs.currencySymbol || '$';
+    const convertedAmount = amount * (currencyPrefs.conversionRates?.[currencyPrefs.currency] || 1);
+    
+    return `${symbol}${convertedAmount.toFixed(decimals)}`;
+  };
+
   // Save energy estimate to backend
   const saveEnergyEstimate = async (deviceId, deviceName, deviceType, currentPower, status) => {
     try {
@@ -262,6 +320,7 @@ export default function Dashboard({ user, onLogout, onNavigateToWiFi }) {
     fetchEnergySummary();
     fetchChartData();
     fetchRealtimeEnergy(); // Fetch stored energy data
+    fetchCurrencyPreferences(); // Fetch user's currency preferences
     
     // Refresh data periodically
     const wifiInterval = setInterval(fetchWiFiDevices, 30000);
@@ -472,8 +531,9 @@ export default function Dashboard({ user, onLogout, onNavigateToWiFi }) {
     { id: 'dashboard', icon: Home, label: 'Dashboard', sublabel: 'Overview', badge: null },
     { id: 'analytics', icon: BarChart3, label: 'Energy Analytics', sublabel: 'Detailed Reports', badge: null },
     { id: 'statistics', icon: Activity, label: 'Statistics', sublabel: 'Usage Statistics', badge: `${(energyFlow / 1000).toFixed(1)}kW` },
-    { id: 'devices', icon: Zap, label: 'Device List', sublabel: 'Manage Devices', badge: `${activeDevicesCount}/${totalDevicesCount}` },
+    { id: 'reports', icon: FileText, label: 'Reports', sublabel: 'Download Reports', badge: null },
     { id: 'wifi', icon: Wifi, label: 'WiFi Devices', sublabel: 'ESP32 & WiFi', badge: totalWifiDevices > 0 ? `${totalWifiDevices}` : null },
+    { id: 'currency', icon: DollarSign, label: 'Currency Settings', sublabel: currencyPrefs ? `${currencyPrefs.currencySymbol} ${currencyPrefs.currency}` : 'Set Currency', badge: null },
     { id: 'notifications', icon: Bell, label: 'Notifications', sublabel: 'Alerts & Updates', badge: null },
     { id: 'help', icon: HelpCircle, label: 'Help & Support', sublabel: 'Get Help', badge: null },
     { id: 'settings', icon: SettingsIcon, label: 'Settings', sublabel: 'App Settings', badge: null },
@@ -520,10 +580,13 @@ export default function Dashboard({ user, onLogout, onNavigateToWiFi }) {
         {/* Render different pages based on activeView */}
         {activeView === 'analytics' && <Analytics />}
         {activeView === 'statistics' && <Statistics />}
+        {activeView === 'reports' && <Reports />}
+        {activeView === 'wifi-management' && <WiFiManagement user={user} />}
+        {activeView === 'currency' && <CurrencySelection user={user} onUpdate={handleCurrencyUpdate} />}
         {activeView === 'notifications' && <Notifications user={user} />}
         {activeView === 'help' && <HelpSupport />}
         {activeView === 'settings' && <Settings user={user} />}
-        {activeView === 'wifi' && <WiFiDevicesNew user={user} onBack={() => setActiveView('dashboard')} />}
+        {activeView === 'wifi' && <WiFiManagement user={user} onBack={() => setActiveView('dashboard')} />}
         
         {/* Dashboard View (default) */}
         {(activeView === 'dashboard' || activeView === 'devices') && (
@@ -856,12 +919,17 @@ export default function Dashboard({ user, onLogout, onNavigateToWiFi }) {
                                 Rated: {device.powerRating}W
                                 {device.description && ` • ${device.description}`}
                               </span>
+                              {device.esp32Id && (
+                                <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 border border-blue-300 font-semibold">
+                                  📡 {device.esp32Id.name || 'ESP32'}
+                                </span>
+                              )}
                               <span className={`text-xs px-3 py-1 rounded-full font-bold ${
                                 device.status === 'online'
                                   ? 'bg-green-100 text-green-700 border border-green-300'
                                   : 'bg-gray-200 text-gray-600'
                               }`}>
-                                {device.status === 'online' ? 'ONLINE' : 'OFFLINE'}
+                                {(device.status || 'unknown').toUpperCase()}
                               </span>
                             </div>
                             
@@ -885,13 +953,13 @@ export default function Dashboard({ user, onLogout, onNavigateToWiFi }) {
                                     <div>
                                       <p className="text-xs text-gray-600 font-medium">Cost/Hour</p>
                                       <p className="text-lg font-bold text-blue-700 tabular-nums">
-                                        ${costPerHour.toFixed(3)}
+                                        {formatCurrency(costPerHour, 3)}
                                       </p>
                                     </div>
                                     <div>
                                       <p className="text-xs text-gray-600 font-medium">Cost/Day</p>
                                       <p className="text-lg font-bold text-purple-700 tabular-nums">
-                                        ${costPerDay.toFixed(2)}
+                                        {formatCurrency(costPerDay, 2)}
                                       </p>
                                     </div>
                                   </div>
@@ -1011,7 +1079,7 @@ export default function Dashboard({ user, onLogout, onNavigateToWiFi }) {
                                   ? 'bg-green-100 text-green-700 border border-green-300'
                                   : 'bg-gray-200 text-gray-600'
                               }`}>
-                                {device.status.toUpperCase()}
+                                {(device.status || 'unknown').toUpperCase()}
                               </span>
                             </div>
                           </div>
@@ -1079,7 +1147,11 @@ export default function Dashboard({ user, onLogout, onNavigateToWiFi }) {
               <button
                 key={item.id}
                 onClick={() => {
-                  setActiveView(item.id);
+                  if (item.id === 'settings' && onNavigateToSettings) {
+                    onNavigateToSettings();
+                  } else {
+                    setActiveView(item.id);
+                  }
                 }}
                 className="relative flex flex-col items-center justify-center min-w-[60px] py-2 transition-all"
                 title={item.label}
@@ -1106,6 +1178,15 @@ export default function Dashboard({ user, onLogout, onNavigateToWiFi }) {
           })}
         </div>
       </nav>
+
+      {/* Currency Selection Modal */}
+      {showCurrencySelection && (
+        <CurrencySelection
+          user={user}
+          onUpdate={handleCurrencyUpdate}
+          showInModal={true}
+        />
+      )}
     </div>
   );
 }

@@ -42,6 +42,49 @@ const userSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  // Currency and Unit Preferences
+  currencyPreferences: {
+    currency: {
+      type: String,
+      default: 'USD',
+      enum: ['USD', 'EUR', 'GBP', 'INR', 'JPY', 'CNY', 'AUD', 'CAD', 'CHF', 'SEK']
+    },
+    currencySymbol: {
+      type: String,
+      default: '$'
+    },
+    country: {
+      type: String,
+      default: 'United States'
+    },
+    electricityRate: {
+      type: Number,
+      default: 0.12, // USD per kWh
+      min: 0
+    },
+    conversionRate: {
+      type: Number,
+      default: 1.0, // Conversion rate from USD
+      min: 0
+    }
+  },
+  displayPreferences: {
+    powerUnit: {
+      type: String,
+      default: 'watts',
+      enum: ['watts', 'kilowatts']
+    },
+    energyUnit: {
+      type: String,
+      default: 'kWh',
+      enum: ['kWh', 'Wh', 'MWh']
+    },
+    calculationMethod: {
+      type: String,
+      default: 'electricity',
+      enum: ['electricity', 'carbon']
+    }
   }
 }, {
   timestamps: true,

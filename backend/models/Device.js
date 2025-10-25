@@ -17,6 +17,11 @@ const deviceSchema = new mongoose.Schema({
     ref: 'User',
     required: [true, 'Device must belong to a user']
   },
+  esp32Id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ESP32',
+    default: null
+  },
   type: {
     type: String,
     enum: ['light', 'fan', 'ac', 'tv', 'heater', 'camera', 'sensor', 'appliance', 'other'],

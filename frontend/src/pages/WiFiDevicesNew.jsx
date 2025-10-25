@@ -3,13 +3,15 @@ import { Wifi, WifiOff, Power, Trash2, RefreshCw, Activity, Signal, Link, Unlink
 
 export default function WiFiDevicesNew({ user, onBack }) {
   const [devices, setDevices] = useState([]);
+  const [esp32Controllers, setEsp32Controllers] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedESP32, setSelectedESP32] = useState(null);
+  const [showDeviceDetails, setShowDeviceDetails] = useState(null);
 
   useEffect(() => {
-    fetchDevices();
-    fetchStats();
+    initializeWiFiDevices();
     
     const interval = setInterval(() => {
       fetchDevices();
@@ -18,6 +20,77 @@ export default function WiFiDevicesNew({ user, onBack }) {
     
     return () => clearInterval(interval);
   }, []);
+
+  const initializeWiFiDevices = async () => {
+    // First try to fetch existing devices
+    await fetchDevices();
+    await fetchStats();
+    await fetchESP32Controllers();
+    
+    // If no devices found, set up demo WiFi devices
+    if (devices.length === 0) {
+      await setupDemoWiFiDevices();
+    }
+  };
+
+  const setupDemoWiFiDevices = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/wifi/setup-demo', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          console.log('✅ WiFi devices setup:', data.message);
+          // Refresh the devices after setup
+          await fetchDevices();
+          await fetchStats();
+          await fetchESP32Controllers();
+        }
+      }
+    } catch (error) {
+      console.error('Error setting up WiFi devices:', error);
+    }
+  };
+
+  const fetchESP32Controllers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/wifi/esp32', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setEsp32Controllers(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching ESP32 controllers:', error);
+    }
+  };
+
+  const fetchDevicesForESP32 = async (esp32Id) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/wifi/esp32/${esp32Id}/devices`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setShowDeviceDetails(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching ESP32 devices:', error);
+    }
+  };
 
   const fetchDevices = async () => {
     try {
@@ -193,18 +266,19 @@ export default function WiFiDevicesNew({ user, onBack }) {
           </div>
         </div>
 
-        {/* Devices List */}
+        {/* ESP32 Controllers */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           <div className="p-4 md:p-6 border-b border-gray-200">
-            <h2 className="text-lg md:text-xl font-bold text-black">Connected Devices</h2>
+            <h2 className="text-lg md:text-xl font-bold text-black">ESP32 Controllers</h2>
+            <p className="text-sm text-gray-600 mt-1">Your WiFi device hubs and connected appliances</p>
           </div>
 
           <div className="divide-y divide-gray-200">
-            {devices.length === 0 ? (
+            {esp32Controllers.length === 0 ? (
               <div className="p-8 md:p-12 text-center">
                 <WifiOff className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-black font-semibold">No WiFi devices found</p>
-                <p className="text-sm text-gray-500">Add ESP32 or WiFi devices to get started</p>
+                <p className="text-black font-semibold">No ESP32 controllers found</p>
+                <p className="text-sm text-gray-500">Setting up your WiFi device system...</p>
               </div>
             ) : (
               devices.map((device) => (
