@@ -5,6 +5,21 @@ import { usePreferences } from '../contexts/PreferencesContext';
 
 const COLORS = ['#000000', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
+/**
+ * Analytics Component
+ * 
+ * This component displays energy consumption and cost analytics for all devices.
+ * 
+ * IMPORTANT - Currency Handling:
+ * - All cost calculations use currency preferences stored in backend (MongoDB)
+ * - Supported currencies: USD, EUR, GBP, INR, JPY, CNY, AUD, CAD, CHF, SEK
+ * - Each currency has its own electricity rate (e.g., $0.12/kWh for USD, ₹6.5/kWh for INR)
+ * - Currency preferences are loaded via PreferencesContext from /api/preferences
+ * - All charts, tables, and statistics automatically use the correct currency symbol and rates
+ * - Cost calculations: dailyCost = dailyConsumption (kWh) × electricityRate (from backend)
+ * 
+ * The component will not render until preferences are loaded to ensure accuracy.
+ */
 export default function Analytics() {
   const { preferences, formatPower, formatEnergy, formatCurrency, calculateCost, loading: prefsLoading } = usePreferences();
   const [devices, setDevices] = useState([]);
@@ -17,6 +32,19 @@ export default function Analytics() {
   useEffect(() => {
     // Wait for preferences to load before fetching analytics
     if (!prefsLoading && preferences?.currencyPreferences) {
+      console.log('📊 Analytics - Using Currency Preferences:', {
+        currency: preferences.currencyPreferences.currency,
+        symbol: preferences.currencyPreferences.currencySymbol,
+        rate: preferences.currencyPreferences.electricityRate,
+        country: preferences.currencyPreferences.country
+      });
+      
+      // Check if we're using default values (indicates backend didn't load properly)
+      if (preferences.currencyPreferences.currency === 'USD' && 
+          preferences.currencyPreferences.electricityRate === 0.12) {
+        console.warn('⚠️ Analytics - Using DEFAULT USD values! Backend preferences may not have loaded.');
+      }
+      
       fetchAnalyticsData();
     }
   }, [prefsLoading, preferences]);
@@ -71,6 +99,18 @@ export default function Analytics() {
 
   // Generate analytics data based on current devices and WiFi connections
   const generateAnalyticsData = () => {
+    // Ensure preferences are loaded before calculations
+    if (!preferences?.currencyPreferences?.electricityRate) {
+      console.warn('⚠️ Analytics - Currency preferences not loaded yet');
+      return [];
+    }
+
+    console.log('💰 Analytics - Calculating costs with:', {
+      currency: preferences.currencyPreferences.currency,
+      rate: preferences.currencyPreferences.electricityRate,
+      symbol: preferences.currencyPreferences.currencySymbol
+    });
+
     let filteredDevices = devices;
 
     // Apply filter
@@ -98,17 +138,21 @@ export default function Analytics() {
         esp32Info = wifiConnection.esp32; // From WiFi connection
       }
       
-      // Use preferences for calculations
+      // Calculate energy consumption in kWh
       const dailyConsumption = (device.powerRating / 1000) * (device.status === 'online' ? 24 : 8); // kWh
-      const dailyCost = calculateCost(dailyConsumption);
+      
+      // IMPORTANT: Use backend stored currency preferences for cost calculation
+      // This ensures the correct currency (USD, INR, EUR, etc.) and rate are used
+      const { electricityRate, currency, currencySymbol } = preferences.currencyPreferences;
+      const dailyCost = dailyConsumption * electricityRate; // Cost in user's selected currency
       const monthlyCost = dailyCost * 30;
       
       return {
         name: device.name.length > 10 ? device.name.substring(0, 10) + '...' : device.name,
         fullName: device.name,
         power: device.powerRating,
-        dailyCost,
-        monthlyCost,
+        dailyCost, // Already in correct currency based on backend preferences
+        monthlyCost, // Already in correct currency based on backend preferences
         dailyConsumption,
         monthlyConsumption: dailyConsumption * 30,
         usage: device.status === 'online' ? device.powerRating * 24 : device.powerRating * 8,
@@ -116,7 +160,10 @@ export default function Analytics() {
         isWifiConnected,
         esp32Name: esp32Info?.name || (isWifiConnected ? 'Unknown ESP32' : 'Not Connected'),
         esp32Location: esp32Info?.location || '-',
-        efficiency: device.status === 'online' ? 95 : 60 // Mock efficiency
+        efficiency: device.status === 'online' ? 95 : 60, // Mock efficiency
+        // Store currency info for reference
+        currency,
+        currencySymbol
       };
     });
   };
@@ -139,15 +186,65 @@ export default function Analytics() {
         <div className="text-red-600">
           <p className="font-bold">Unable to load currency preferences</p>
           <p className="text-sm mt-2">Please set your currency preferences in Settings</p>
+          <p className="text-xs mt-4 text-gray-500">
+            Make sure you have selected your currency (USD, INR, EUR, etc.) and electricity rate in the Settings page
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if we're using default values (backend didn't load user preferences)
+  const isUsingDefaults = preferences.currencyPreferences.currency === 'USD' && 
+                          preferences.currencyPreferences.electricityRate === 0.12 &&
+                          preferences.currencyPreferences.country === 'United States';
+  
+  if (isUsingDefaults) {
+    return (
+      <div className="p-8 text-center">
+        <div className="text-yellow-600">
+          <p className="font-bold">⚠️ Using Default Currency Settings</p>
+          <p className="text-sm mt-2">You haven't set your currency preferences yet</p>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4 max-w-md mx-auto">
+            <p className="text-sm text-gray-700 mb-2">Currently showing costs in:</p>
+            <p className="font-semibold text-yellow-800">$ USD (United States) - $0.12/kWh</p>
+            <button 
+              onClick={() => window.location.href = '/preferences'} 
+              className="mt-3 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              Set Your Currency → Settings
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-4">
+            Analytics will show dummy data until you configure your currency preferences
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Additional safety check for electricity rate
+  if (!preferences.currencyPreferences.electricityRate || preferences.currencyPreferences.electricityRate <= 0) {
+    return (
+      <div className="p-8 text-center">
+        <div className="text-yellow-600">
+          <p className="font-bold">⚠️ Invalid Electricity Rate</p>
+          <p className="text-sm mt-2">Your electricity rate is not set or invalid</p>
+          <p className="text-xs mt-4 text-gray-500">
+            Current rate: {preferences.currencyPreferences.electricityRate || 'Not Set'}<br/>
+            Please update your electricity rate in Settings for accurate cost calculations
+          </p>
         </div>
       </div>
     );
   }
 
   // Generate current analytics data based on filters
+  // IMPORTANT: This uses backend stored currency preferences (USD, INR, EUR, etc.)
   const currentEnergyData = generateAnalyticsData();
 
-  // Calculate statistics
+  // Calculate statistics using the correct currency from backend
+  // All monetary values will be in the user's selected currency with correct rates
   const totalDailyCost = currentEnergyData.reduce((sum, d) => sum + d.dailyCost, 0);
   const totalMonthlyConsumption = currentEnergyData.reduce((sum, d) => sum + d.monthlyConsumption, 0);
   const maxCostDevice = currentEnergyData.reduce((max, d) => d.dailyCost > max.dailyCost ? d : max, currentEnergyData[0] || {});
@@ -168,8 +265,16 @@ export default function Analytics() {
               
               {/* Currency & Unit Display */}
               <div className="flex items-center gap-4 mt-2 text-sm">
-                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-semibold">
-                  💰 {preferences.currencyPreferences.currencySymbol} {preferences.currencyPreferences.currency} - {preferences.currencyPreferences.country}
+                <span className={`px-3 py-1 rounded-full font-semibold ${
+                  preferences.currencyPreferences.currency === 'USD' && 
+                  preferences.currencyPreferences.electricityRate === 0.12
+                    ? 'bg-red-100 text-red-800 border border-red-300'
+                    : 'bg-blue-100 text-blue-800'
+                }`}>
+                  {preferences.currencyPreferences.currency === 'USD' && 
+                   preferences.currencyPreferences.electricityRate === 0.12 ? '⚠️' : '💰'} {preferences.currencyPreferences.currencySymbol} {preferences.currencyPreferences.currency} - {preferences.currencyPreferences.country}
+                  {preferences.currencyPreferences.currency === 'USD' && 
+                   preferences.currencyPreferences.electricityRate === 0.12 && ' (DEFAULT)'}
                 </span>
                 <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full font-semibold">
                   ⚡ Rate: {preferences.currencyPreferences.currencySymbol}{preferences.currencyPreferences.electricityRate}/kWh
@@ -316,12 +421,18 @@ export default function Analytics() {
               <BarChart data={currentEnergyData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-                <YAxis />
+                <YAxis 
+                  tickFormatter={(value) => `${preferences.currencyPreferences.currencySymbol}${value.toFixed(0)}`}
+                />
                 <Tooltip 
-                  formatter={(value, name) => [
-                    formatCurrency(value),
-                    name === 'dailyCost' ? 'Daily Cost' : name
-                  ]}
+                  formatter={(value, name) => {
+                    // Use backend stored currency for formatting
+                    const currencySymbol = preferences.currencyPreferences.currencySymbol;
+                    return [
+                      `${currencySymbol}${value.toFixed(2)}`,
+                      name === 'dailyCost' ? `Daily Cost (${preferences.currencyPreferences.currency})` : name
+                    ];
+                  }}
                   labelFormatter={(label) => {
                     const device = currentEnergyData.find(d => d.name === label);
                     return device ? device.fullName : label;
@@ -382,9 +493,18 @@ export default function Analytics() {
               <BarChart data={currentEnergyData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-                <YAxis />
+                <YAxis 
+                  tickFormatter={(value) => `${preferences.currencyPreferences.currencySymbol}${value.toFixed(0)}`}
+                />
                 <Tooltip 
-                  formatter={(value) => [formatCurrency(value), 'Monthly Cost']}
+                  formatter={(value) => {
+                    // Use backend stored currency for formatting
+                    const currencySymbol = preferences.currencyPreferences.currencySymbol;
+                    return [
+                      `${currencySymbol}${value.toFixed(2)}`,
+                      `Monthly Cost (${preferences.currencyPreferences.currency})`
+                    ];
+                  }}
                   labelFormatter={(label) => {
                     const device = currentEnergyData.find(d => d.name === label);
                     return device ? `${device.fullName} (${device.status})` : label;

@@ -533,7 +533,6 @@ export default function Dashboard({ user, onLogout, onNavigateToWiFi, onNavigate
     { id: 'statistics', icon: Activity, label: 'Statistics', sublabel: 'Usage Statistics', badge: `${(energyFlow / 1000).toFixed(1)}kW` },
     { id: 'reports', icon: FileText, label: 'Reports', sublabel: 'Download Reports', badge: null },
     { id: 'wifi', icon: Wifi, label: 'WiFi Devices', sublabel: 'ESP32 & WiFi', badge: totalWifiDevices > 0 ? `${totalWifiDevices}` : null },
-    { id: 'currency', icon: DollarSign, label: 'Currency Settings', sublabel: currencyPrefs ? `${currencyPrefs.currencySymbol} ${currencyPrefs.currency}` : 'Set Currency', badge: null },
     { id: 'notifications', icon: Bell, label: 'Notifications', sublabel: 'Alerts & Updates', badge: null },
     { id: 'help', icon: HelpCircle, label: 'Help & Support', sublabel: 'Get Help', badge: null },
     { id: 'settings', icon: SettingsIcon, label: 'Settings', sublabel: 'App Settings', badge: null },

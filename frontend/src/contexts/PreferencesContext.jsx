@@ -39,10 +39,12 @@ export const PreferencesProvider = ({ children }) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
+        console.warn('⚠️ PreferencesContext - No auth token found');
         setLoading(false);
         return;
       }
 
+      console.log('🔄 PreferencesContext - Loading preferences from backend...');
       const response = await fetch('http://localhost:5000/api/preferences', {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -52,11 +54,17 @@ export const PreferencesProvider = ({ children }) => {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
+          console.log('✅ PreferencesContext - Loaded preferences:', data.data);
           setPreferences(data.data);
+        } else {
+          console.error('❌ PreferencesContext - API returned error:', data);
         }
+      } else {
+        console.error('❌ PreferencesContext - HTTP error:', response.status, response.statusText);
       }
     } catch (error) {
-      console.error('Error loading preferences:', error);
+      console.error('❌ PreferencesContext - Failed to load preferences:', error);
+      // Don't fallback to defaults silently - let user know there's an issue
     } finally {
       setLoading(false);
     }
