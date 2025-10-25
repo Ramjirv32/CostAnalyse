@@ -15,6 +15,7 @@ const wifiEnergyRoutes = require('./routes/wifiEnergy');
 const currencyRoutes = require('./routes/currency');
 const energyEstimateRoutes = require('./routes/energyEstimates');
 const preferencesRoutes = require('./routes/preferences');
+const reportsRoutes = require('./routes/reports');
 const energySimulator = require('./services/energySimulator');
 const wifiEnergyCalculator = require('./services/wifiEnergyCalculator');
 const emailService = require('./services/emailService');
@@ -87,6 +88,7 @@ app.use('/api/wifi-energy', wifiEnergyRoutes);
 app.use('/api/currency', currencyRoutes);
 app.use('/api/energy', energyEstimateRoutes);
 app.use('/api/preferences', preferencesRoutes);
+app.use('/api/reports', reportsRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

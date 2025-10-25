@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { 
   Download, Calendar, Clock, FileText, TrendingUp, 
   Filter, Zap, DollarSign, ChevronDown, AlertCircle,
-  CheckCircle, RefreshCw
+  CheckCircle, RefreshCw, Mail
 } from 'lucide-react';
 import { generateReportPDF, downloadReportAsHTML } from '../utils/pdfGenerator';
 
@@ -270,6 +270,322 @@ export default function Reports() {
     }
   };
 
+  const sendReportEmail = async () => {
+    if (reportData.length === 0) {
+      alert('Please generate a report first');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Generate PDF blob first
+      const htmlContent = await generatePDFContent();
+      
+      // Convert HTML to PDF using the browser's print functionality
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      
+      // Use the browser's built-in PDF generation
+      const pdfBlob = await new Promise((resolve) => {
+        printWindow.addEventListener('afterprint', () => {
+          printWindow.close();
+        });
+        
+        // Create a simple PDF-like content
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 800;
+        canvas.height = 1100;
+        
+        // Fill with white background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Add title
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 24px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Energy Usage Report', canvas.width / 2, 50);
+        
+        // Add date
+        ctx.font = '16px Arial';
+        const dateRange = getDateRangeString();
+        ctx.fillText(`Period: ${dateRange}`, canvas.width / 2, 80);
+        ctx.fillText(`Generated: ${new Date().toLocaleDateString()}`, canvas.width / 2, 100);
+        
+        // Add summary stats
+        const stats = getSummaryStats();
+        if (stats) {
+          ctx.textAlign = 'left';
+          ctx.font = 'bold 18px Arial';
+          ctx.fillText('Summary Statistics:', 50, 150);
+          
+          ctx.font = '14px Arial';
+          ctx.fillText(`Total Usage: ${stats.totalUsage} kWh`, 50, 180);
+          ctx.fillText(`Total Cost: ${stats.totalCost}`, 50, 200);
+          ctx.fillText(`Average Daily Cost: ${stats.avgDailyCost}`, 50, 220);
+          ctx.fillText(`Number of Devices: ${stats.deviceCount}`, 50, 240);
+          ctx.fillText(`Report Period: ${stats.dateCount} days`, 50, 260);
+        }
+        
+        // Add device data table header
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText('Device Data:', 50, 300);
+        
+        ctx.font = '12px Arial';
+        const tableStartY = 330;
+        const rowHeight = 20;
+        
+        // Table headers
+        ctx.fillText('Device Name', 50, tableStartY);
+        ctx.fillText('Type', 200, tableStartY);
+        ctx.fillText('Usage (kWh)', 350, tableStartY);
+        ctx.fillText('Cost', 450, tableStartY);
+        ctx.fillText('Status', 550, tableStartY);
+        
+        // Draw header line
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(50, tableStartY + 5);
+        ctx.lineTo(700, tableStartY + 5);
+        ctx.stroke();
+        
+        // Add sample data rows (first 20 items)
+        const displayData = reportData.slice(0, 20);
+        displayData.forEach((item, index) => {
+          const y = tableStartY + 20 + (index * rowHeight);
+          if (y > canvas.height - 50) return; // Don't overflow page
+          
+          ctx.fillText(item.deviceName || 'Unknown', 50, y);
+          ctx.fillText(item.deviceType || 'N/A', 200, y);
+          ctx.fillText(item.usage.toFixed(2), 350, y);
+          ctx.fillText(`$${item.cost.toFixed(2)}`, 450, y);
+          ctx.fillText(item.status || 'active', 550, y);
+        });
+        
+        // Convert canvas to blob
+        canvas.toBlob((blob) => {
+          resolve(blob);
+        }, 'image/png');
+      });
+      
+      // Convert to a simple PDF format (for demo purposes, we'll send the data)
+      const formData = new FormData();
+      
+      // Create a simple text-based PDF content
+      const pdfContent = createSimplePDFContent();
+      const pdfBlob2 = new Blob([pdfContent], { type: 'application/pdf' });
+      
+      formData.append('pdfFile', pdfBlob2, `energy-report-${reportType}-${new Date().toISOString().split('T')[0]}.pdf`);
+      formData.append('reportMetadata', JSON.stringify({
+        reportType,
+        selectedDate,
+        startDate,
+        endDate,
+        reportData: reportData.slice(0, 100), // Limit data size for email
+        generateDate: new Date().toISOString()
+      }));
+
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/reports/send-pdf', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`✅ Report sent successfully to itzrvm2337@gmail.com`);
+      } else {
+        alert(`❌ Failed to send report: ${result.message}`);
+      }
+
+    } catch (error) {
+      console.error('Error sending report:', error);
+      alert('Error sending report. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createSimplePDFContent = () => {
+    const stats = getSummaryStats();
+    const dateRange = getDateRangeString();
+    
+    return `%PDF-1.4
+1 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
+
+2 0 obj
+<<
+/Type /Pages
+/Kids [3 0 R]
+/Count 1
+>>
+endobj
+
+3 0 obj
+<<
+/Type /Page
+/Parent 2 0 R
+/MediaBox [0 0 612 792]
+/Contents 4 0 R
+/Resources <<
+/Font <<
+/F1 5 0 R
+>>
+>>
+>>
+endobj
+
+4 0 obj
+<<
+/Length 500
+>>
+stream
+BT
+/F1 12 Tf
+72 720 Td
+(Energy Usage Report) Tj
+0 -20 Td
+(Period: ${dateRange}) Tj
+0 -20 Td
+(Generated: ${new Date().toLocaleDateString()}) Tj
+0 -40 Td
+(Summary Statistics:) Tj
+0 -20 Td
+(Total Usage: ${stats ? stats.totalUsage : '0'} kWh) Tj
+0 -20 Td
+(Total Cost: ${stats ? stats.totalCost : '$0.00'}) Tj
+0 -20 Td
+(Device Count: ${stats ? stats.deviceCount : '0'}) Tj
+0 -20 Td
+(Report Period: ${stats ? stats.dateCount : '0'} days) Tj
+ET
+endstream
+endobj
+
+5 0 obj
+<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Helvetica
+>>
+endobj
+
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000274 00000 n 
+0000000824 00000 n 
+trailer
+<<
+/Size 6
+/Root 1 0 R
+>>
+startxref
+901
+%%EOF`;
+  };
+
+  const generatePDFContent = async () => {
+    const stats = getSummaryStats();
+    const dateRange = getDateRangeString();
+    
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Energy Report - ${dateRange}</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; }
+            .stat { background: #f5f5f5; padding: 15px; border-radius: 5px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>Energy Usage Report</h1>
+            <p>Period: ${dateRange}</p>
+            <p>Generated: ${new Date().toLocaleDateString()}</p>
+        </div>
+        
+        ${stats ? `
+        <div class="stats">
+            <div class="stat">
+                <h3>Total Usage</h3>
+                <p>${stats.totalUsage} kWh</p>
+            </div>
+            <div class="stat">
+                <h3>Total Cost</h3>
+                <p>${stats.totalCost}</p>
+            </div>
+            <div class="stat">
+                <h3>Average Daily Cost</h3>
+                <p>${stats.avgDailyCost}</p>
+            </div>
+            <div class="stat">
+                <h3>Device Count</h3>
+                <p>${stats.deviceCount}</p>
+            </div>
+        </div>
+        ` : ''}
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Device Name</th>
+                    <th>Type</th>
+                    <th>Date</th>
+                    <th>Usage (kWh)</th>
+                    <th>Cost</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${reportData.slice(0, 50).map(item => `
+                    <tr>
+                        <td>${item.deviceName || 'Unknown'}</td>
+                        <td>${item.deviceType || 'N/A'}</td>
+                        <td>${new Date(item.date).toLocaleDateString()}</td>
+                        <td>${item.usage.toFixed(2)}</td>
+                        <td>$${item.cost.toFixed(2)}</td>
+                        <td>${item.status || 'active'}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    </body>
+    </html>`;
+  };
+
+  const getDateRangeString = () => {
+    switch (reportType) {
+      case 'specific':
+        return new Date(selectedDate).toLocaleDateString();
+      case 'range':
+        return `${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`;
+      default:
+        return reportType.charAt(0).toUpperCase() + reportType.slice(1);
+    }
+  };
+
   const getSummaryStats = () => {
     if (reportData.length === 0) return null;
 
@@ -495,10 +811,39 @@ export default function Reports() {
           </div>
         )}
 
+        {/* Send Report via Email */}
+        {reportData.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">📧 Send Report via Email</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Send PDF report to <strong>itzrvm2337@gmail.com</strong> for demo purposes
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={sendReportEmail}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-4 h-4" />
+                    Send PDF Report
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Download Options */}
         {reportData.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Download Options</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">📁 Download Options</h3>
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={downloadCSV}
