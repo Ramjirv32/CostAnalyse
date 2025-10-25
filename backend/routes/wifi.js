@@ -749,4 +749,272 @@ router.post('/setup-demo', auth, async (req, res) => {
   }
 });
 
+// Scan for nearby WiFi networks and devices
+router.get('/scan', auth, async (req, res) => {
+  try {
+    console.log('📡 Starting WiFi network scan...');
+    
+    // Simulate WiFi scanning (in production, this would use actual WiFi scanning libraries)
+    const mockNetworks = [
+      {
+        ssid: 'PowerAI_Hub_001',
+        bssid: '00:1B:44:11:3A:B7',
+        channel: 6,
+        frequency: 2437,
+        signalStrength: -42,
+        security: ['WPA2-PSK'],
+        deviceType: 'esp32',
+        deviceCount: 3,
+        isManaged: true,
+        isSecure: true,
+        lastSeen: new Date()
+      },
+      {
+        ssid: 'PowerAI_Hub_002',
+        bssid: '00:1B:44:11:3A:C8',
+        channel: 11,
+        frequency: 2462,
+        signalStrength: -55,
+        security: ['WPA2-PSK'],
+        deviceType: 'esp32',
+        deviceCount: 5,
+        isManaged: true,
+        isSecure: true,
+        lastSeen: new Date()
+      },
+      {
+        ssid: 'SmartHome_WiFi',
+        bssid: 'A0:B1:C2:D3:E4:F5',
+        channel: 1,
+        frequency: 2412,
+        signalStrength: -38,
+        security: ['WPA3-SAE'],
+        deviceType: 'router',
+        deviceCount: 8,
+        isManaged: false,
+        isSecure: true,
+        lastSeen: new Date()
+      },
+      {
+        ssid: 'IoT_Devices_5G',
+        bssid: 'B1:C2:D3:E4:F5:A6',
+        channel: 36,
+        frequency: 5180,
+        signalStrength: -48,
+        security: ['WPA2-PSK'],
+        deviceType: 'router',
+        deviceCount: 12,
+        isManaged: false,
+        isSecure: true,
+        lastSeen: new Date()
+      },
+      {
+        ssid: 'Guest_Network',
+        bssid: 'C2:D3:E4:F5:A6:B7',
+        channel: 6,
+        frequency: 2437,
+        signalStrength: -65,
+        security: [],
+        deviceType: 'router',
+        deviceCount: 2,
+        isManaged: false,
+        isSecure: false,
+        lastSeen: new Date()
+      },
+      {
+        ssid: 'ESP32_AP_Kitchen',
+        bssid: 'D3:E4:F5:A6:B7:C8',
+        channel: 8,
+        frequency: 2447,
+        signalStrength: -52,
+        security: ['WPA2-PSK'],
+        deviceType: 'esp32',
+        deviceCount: 1,
+        isManaged: true,
+        isSecure: true,
+        lastSeen: new Date()
+      }
+    ];
+
+    // Add random variations for realistic simulation
+    const networks = mockNetworks.map(network => ({
+      ...network,
+      signalStrength: network.signalStrength + Math.floor(Math.random() * 10 - 5), // ±5 dBm variation
+      deviceCount: network.deviceCount + Math.floor(Math.random() * 3), // ±3 device variation
+    }));
+
+    console.log(`✅ WiFi scan completed: Found ${networks.length} networks`);
+
+    res.json({
+      success: true,
+      message: `Found ${networks.length} WiFi networks`,
+      data: networks,
+      count: networks.length,
+      scanTime: new Date(),
+      metadata: {
+        scanDuration: Math.floor(Math.random() * 3000 + 2000), // 2-5 seconds
+        channelsScanned: [1, 6, 8, 11, 36, 40, 44, 48],
+        totalAPs: networks.length,
+        secureAPs: networks.filter(n => n.security.length > 0).length,
+        managedAPs: networks.filter(n => n.isManaged).length
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error scanning WiFi networks:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to scan WiFi networks',
+      message: error.message
+    });
+  }
+});
+
+// Discover devices on a specific network or all networks
+router.post('/discover', auth, async (req, res) => {
+  try {
+    const { networkSSID, scanAll = false } = req.body;
+    
+    console.log('🔍 Starting device discovery...', { networkSSID, scanAll });
+    
+    // Simulate device discovery (in production, this would use network scanning)
+    const mockDevices = [
+      {
+        name: 'Smart Thermostat',
+        type: 'thermostat',
+        macAddress: '00:11:22:33:44:55',
+        ipAddress: '192.168.1.101',
+        manufacturer: 'Nest',
+        model: 'Learning Thermostat v3',
+        networkSSID: 'SmartHome_WiFi',
+        signalStrength: -35,
+        isOnline: true,
+        services: ['http', 'telnet', 'ssh'],
+        openPorts: [80, 443, 8080],
+        deviceCategory: 'climate',
+        powerRating: 3.5,
+        lastSeen: new Date()
+      },
+      {
+        name: 'Smart Light Bulb 1',
+        type: 'light',
+        macAddress: '00:11:22:33:44:56',
+        ipAddress: '192.168.1.102',
+        manufacturer: 'Philips',
+        model: 'Hue Color A19',
+        networkSSID: 'SmartHome_WiFi',
+        signalStrength: -42,
+        isOnline: true,
+        services: ['http', 'coap'],
+        openPorts: [80, 443],
+        deviceCategory: 'lighting',
+        powerRating: 9.5,
+        lastSeen: new Date()
+      },
+      {
+        name: 'Smart Lock',
+        type: 'lock',
+        macAddress: '00:11:22:33:44:57',
+        ipAddress: '192.168.1.103',
+        manufacturer: 'August',
+        model: 'Smart Lock Pro',
+        networkSSID: 'SmartHome_WiFi',
+        signalStrength: -48,
+        isOnline: true,
+        services: ['https', 'bluetooth'],
+        openPorts: [443, 8883],
+        deviceCategory: 'security',
+        powerRating: 2.0,
+        lastSeen: new Date()
+      },
+      {
+        name: 'ESP32 Kitchen Sensor',
+        type: 'sensor',
+        macAddress: '30:AE:A4:12:34:56',
+        ipAddress: '192.168.1.104',
+        manufacturer: 'Espressif',
+        model: 'ESP32-WROOM-32',
+        networkSSID: 'PowerAI_Hub_001',
+        signalStrength: -28,
+        isOnline: true,
+        services: ['http', 'mqtt', 'websocket'],
+        openPorts: [80, 1883, 8080],
+        deviceCategory: 'sensor',
+        powerRating: 0.5,
+        lastSeen: new Date()
+      },
+      {
+        name: 'Smart Camera',
+        type: 'camera',
+        macAddress: '00:11:22:33:44:58',
+        ipAddress: '192.168.1.105',
+        manufacturer: 'Ring',
+        model: 'Indoor Cam',
+        networkSSID: 'SmartHome_WiFi',
+        signalStrength: -52,
+        isOnline: true,
+        services: ['https', 'rtsp', 'p2p'],
+        openPorts: [443, 554, 8000],
+        deviceCategory: 'security',
+        powerRating: 5.2,
+        lastSeen: new Date()
+      },
+      {
+        name: 'Smart Speaker',
+        type: 'speaker',
+        macAddress: '00:11:22:33:44:59',
+        ipAddress: '192.168.1.106',
+        manufacturer: 'Amazon',
+        model: 'Echo Dot 4th Gen',
+        networkSSID: 'SmartHome_WiFi',
+        signalStrength: -45,
+        isOnline: true,
+        services: ['https', 'spotify', 'alexa'],
+        openPorts: [443, 4070, 55442],
+        deviceCategory: 'entertainment',
+        powerRating: 15.0,
+        lastSeen: new Date()
+      }
+    ];
+
+    // Filter devices based on network if specified
+    let discoveredDevices = mockDevices;
+    if (networkSSID && !scanAll) {
+      discoveredDevices = mockDevices.filter(device => device.networkSSID === networkSSID);
+    }
+
+    // Add some randomization
+    discoveredDevices = discoveredDevices.map(device => ({
+      ...device,
+      signalStrength: device.signalStrength + Math.floor(Math.random() * 10 - 5),
+      isOnline: Math.random() > 0.1, // 90% online rate
+    }));
+
+    console.log(`✅ Device discovery completed: Found ${discoveredDevices.length} devices`);
+
+    res.json({
+      success: true,
+      message: `Discovered ${discoveredDevices.length} devices${networkSSID ? ` on network: ${networkSSID}` : ''}`,
+      data: discoveredDevices,
+      count: discoveredDevices.length,
+      scanTime: new Date(),
+      networkSSID: networkSSID || 'All Networks',
+      metadata: {
+        scanDuration: Math.floor(Math.random() * 5000 + 3000), // 3-8 seconds
+        onlineDevices: discoveredDevices.filter(d => d.isOnline).length,
+        deviceCategories: [...new Set(discoveredDevices.map(d => d.deviceCategory))],
+        manufacturers: [...new Set(discoveredDevices.map(d => d.manufacturer))]
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error discovering devices:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to discover devices',
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;

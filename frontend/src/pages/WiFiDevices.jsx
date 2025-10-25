@@ -16,8 +16,30 @@ import {
   Zap,
   Signal,
   Link,
-  Unlink
+  Unlink,
+  Shield,
+  ShieldOff,
+  Eye,
+  EyeOff,
+  Lock,
+  Unlock,
+  Router,
+  Smartphone,
+  Lightbulb,
+  Camera,
+  Speaker,
+  Thermometer,
+  Filter,
+  SortAsc,
+  SortDesc,
+  Clock,
+  Globe,
+  AlertCircle,
+  CheckCircle,
+  Info,
+  Radar
 } from 'lucide-react';
+import WiFiScanner from './WiFiScanner';
 
 export default function WiFiDevices({ user, onBack }) {
   const [activeTab, setActiveTab] = useState('scan'); // scan, devices, control
@@ -32,6 +54,18 @@ export default function WiFiDevices({ user, onBack }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  
+  // Enhanced scanner state
+  const [lastScanTime, setLastScanTime] = useState(null);
+  const [scanMetadata, setScanMetadata] = useState(null);
+  const [networkFilter, setNetworkFilter] = useState('all'); // all, secure, open, managed
+  const [deviceFilter, setDeviceFilter] = useState('all'); // all, online, offline, esp32, router
+  const [sortBy, setSortBy] = useState('signal'); // signal, name, security, devices
+  const [sortOrder, setSortOrder] = useState('desc'); // asc, desc
+  const [showNetworkDetails, setShowNetworkDetails] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [refreshInterval, setRefreshInterval] = useState(null);
+  const [showWiFiScanner, setShowWiFiScanner] = useState(false);
 
   // Fetch paired devices
   const fetchPairedDevices = async () => {
@@ -80,6 +114,8 @@ export default function WiFiDevices({ user, onBack }) {
       const data = await response.json();
       if (data.success) {
         setNetworks(data.data);
+        setScanMetadata(data.metadata);
+        setLastScanTime(new Date(data.scanTime));
         setSuccess(`Found ${data.count} networks`);
       }
     } catch (error) {
@@ -104,7 +140,10 @@ export default function WiFiDevices({ user, onBack }) {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ networkSSID })
+        body: JSON.stringify({
+          networkSSID: networkSSID,
+          scanAll: !networkSSID
+        })
       });
 
       if (!response.ok) throw new Error('Failed to discover devices');
@@ -112,7 +151,7 @@ export default function WiFiDevices({ user, onBack }) {
       const data = await response.json();
       if (data.success) {
         setDiscoveredDevices(data.data);
-        setSuccess(`Discovered ${data.count} devices`);
+        setSuccess(`Discovered ${data.count} devices${networkSSID ? ` on ${networkSSID}` : ''}`);
       }
     } catch (error) {
       console.error('Error discovering devices:', error);
@@ -242,6 +281,120 @@ export default function WiFiDevices({ user, onBack }) {
     return { bars: 1, quality: 'Poor', color: 'gray' };
   };
 
+  // Get device icon based on type
+  const getDeviceIcon = (deviceType, deviceCategory) => {
+    switch (deviceCategory?.toLowerCase()) {
+      case 'lighting': return Lightbulb;
+      case 'security': return Shield;
+      case 'entertainment': return Speaker;
+      case 'climate': return Thermometer;
+      case 'sensor': return Radio;
+      default:
+        switch (deviceType?.toLowerCase()) {
+          case 'esp32': return Cpu;
+          case 'router': return Router;
+          case 'smartphone': return Smartphone;
+          case 'camera': return Camera;
+          default: return Wifi;
+        }
+    }
+  };
+
+  // Filter networks based on current filter
+  const getFilteredNetworks = () => {
+    let filtered = [...networks];
+    
+    switch (networkFilter) {
+      case 'secure':
+        filtered = filtered.filter(n => n.security.length > 0);
+        break;
+      case 'open':
+        filtered = filtered.filter(n => n.security.length === 0);
+        break;
+      case 'managed':
+        filtered = filtered.filter(n => n.isManaged);
+        break;
+      default:
+        break;
+    }
+
+    // Sort networks
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'signal':
+          comparison = b.signalStrength - a.signalStrength;
+          break;
+        case 'name':
+          comparison = a.ssid.localeCompare(b.ssid);
+          break;
+        case 'security':
+          comparison = b.security.length - a.security.length;
+          break;
+        case 'devices':
+          comparison = b.deviceCount - a.deviceCount;
+          break;
+        default:
+          comparison = b.signalStrength - a.signalStrength;
+      }
+      return sortOrder === 'desc' ? comparison : -comparison;
+    });
+
+    return filtered;
+  };
+
+  // Filter discovered devices
+  const getFilteredDevices = () => {
+    let filtered = [...discoveredDevices];
+    
+    switch (deviceFilter) {
+      case 'online':
+        filtered = filtered.filter(d => d.isOnline);
+        break;
+      case 'offline':
+        filtered = filtered.filter(d => !d.isOnline);
+        break;
+      case 'esp32':
+        filtered = filtered.filter(d => d.type === 'sensor' || d.manufacturer === 'Espressif');
+        break;
+      case 'router':
+        filtered = filtered.filter(d => d.type === 'router');
+        break;
+      default:
+        break;
+    }
+
+    return filtered;
+  };
+
+  // Auto-refresh functionality
+  useEffect(() => {
+    if (autoRefresh) {
+      const interval = setInterval(() => {
+        scanNetworks();
+      }, 30000); // Refresh every 30 seconds
+      setRefreshInterval(interval);
+      
+      return () => {
+        if (interval) clearInterval(interval);
+      };
+    } else {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+        setRefreshInterval(null);
+      }
+    }
+  }, [autoRefresh]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
@@ -260,7 +413,17 @@ export default function WiFiDevices({ user, onBack }) {
                 <p className="text-gray-300 mt-1">Detect, pair, and control WiFi devices</p>
               </div>
             </div>
-            <Wifi className="w-12 h-12" />
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setShowWiFiScanner(true)}
+                className="p-3 bg-white text-black rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
+                title="Scan Nearby WiFi Networks"
+              >
+                <Radar className="w-5 h-5" />
+                <span className="text-sm font-medium">Scan</span>
+              </button>
+              <Wifi className="w-12 h-12" />
+            </div>
           </div>
         </div>
       </div>
@@ -504,6 +667,7 @@ export default function WiFiDevices({ user, onBack }) {
                     </div>
                   </div>
 
+
                   {/* Expanded Device Controls */}
                   {expandedDevice === device._id && (
                     <div className="p-6 border-t-4 border-black">
@@ -528,6 +692,8 @@ export default function WiFiDevices({ user, onBack }) {
                               Turn OFF
                             </button>
                           </div>
+
+
 
                           {device.capabilities?.includes('dimmer') && (
                             <div>
@@ -619,6 +785,16 @@ export default function WiFiDevices({ user, onBack }) {
           </div>
         )}
       </div>
+
+      {/* WiFi Scanner Modal/Overlay */}
+      {showWiFiScanner && (
+        <div className="fixed inset-0 bg-white z-50">
+          <WiFiScanner 
+            user={user} 
+            onBack={() => setShowWiFiScanner(false)} 
+          />
+        </div>
+      )}
     </div>
   );
 }

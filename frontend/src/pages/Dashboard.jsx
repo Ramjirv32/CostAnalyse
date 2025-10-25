@@ -25,7 +25,8 @@ import {
   HelpCircle,
   ChevronLeft,
   RefreshCw,
-  FileText
+  FileText,
+  Search
 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -36,6 +37,7 @@ import Reports from './Reports';
 import Notifications from './Notifications';
 import HelpSupport from './HelpSupport';
 import WiFiManagement from './WiFiManagement';
+import WiFiScanner from './WiFiScanner';
 // import Settings from './Settings';
 import CurrencySelection from '../components/CurrencySelection';
 
@@ -533,6 +535,7 @@ export default function Dashboard({ user, onLogout, onNavigateToWiFi, onNavigate
     { id: 'statistics', icon: Activity, label: 'Statistics', sublabel: 'Usage Statistics', badge: `${(energyFlow / 1000).toFixed(1)}kW` },
     { id: 'reports', icon: FileText, label: 'Reports', sublabel: 'Download Reports', badge: null },
     { id: 'wifi', icon: Wifi, label: 'WiFi Devices', sublabel: 'ESP32 & WiFi', badge: totalWifiDevices > 0 ? `${totalWifiDevices}` : null },
+    { id: 'wifiscanner', icon: Search, label: 'WiFi Scanner', sublabel: 'Network Discovery', badge: null },
     { id: 'notifications', icon: Bell, label: 'Notifications', sublabel: 'Alerts & Updates', badge: null },
     { id: 'help', icon: HelpCircle, label: 'Help & Support', sublabel: 'Get Help', badge: null },
     { id: 'settings', icon: SettingsIcon, label: 'Settings', sublabel: 'App Settings', badge: null },
@@ -586,6 +589,7 @@ export default function Dashboard({ user, onLogout, onNavigateToWiFi, onNavigate
         {activeView === 'help' && <HelpSupport />}
         {activeView === 'settings' && <Settings user={user} />}
         {activeView === 'wifi' && <WiFiManagement user={user} onBack={() => setActiveView('dashboard')} />}
+        {activeView === 'wifiscanner' && <WiFiScanner />}
         
         {/* Dashboard View (default) */}
         {(activeView === 'dashboard' || activeView === 'devices') && (
